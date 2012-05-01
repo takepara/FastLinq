@@ -4,3 +4,9 @@ obj
 
 # mstest test results
 TestResults
+/Book1.xlsx
+*.suo
+/_ReSharper.FastLinq/*
+/fastlinq.v35_data.v35.txt
+/fastlinq.v4_data.v35.txt
+/fastlinq.v4_data.v4.txt

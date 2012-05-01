@@ -1,0 +1,144 @@
+﻿<#@ template debug="false" hostspecific="false" language="C#" #>
+<#@ output extension=".cs" #>
+<#@ Assembly Name="System.Core.dll" #>
+<#@ import namespace="System" #>
+<#@ import namespace="System.IO" #>
+<#@ import namespace="System.Text" #>
+<#@ import namespace="System.Diagnostics" #>
+<#@ import namespace="System.Linq" #>
+<#@ import namespace="System.Collections" #>
+<#@ import namespace="System.Collections.Generic" #> 
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
+using System.Linq.Expressions;
+using System.Threading;
+
+namespace FastLinq
+{
+    public class ParameterToConstantVisitor : ExpressionVisitor
+    {
+        readonly HashSet<string> _replaced = new HashSet<string>();
+        Dictionary<string, Expression> _replaces;
+
+        public Expression Replace(Expression expression, Dictionary<string, Expression> replaces)
+        {
+            _replaces = replaces;
+
+            return base.Visit(expression);
+        }
+
+        protected override Expression VisitParameter(ParameterExpression node)
+        {
+            if (_replaces.ContainsKey(node.Name) && !_replaced.Contains(node.Name))
+            {
+                _replaced.Add(node.Name);
+                return _replaces[node.Name];
+            }
+            return base.VisitParameter(node);
+        }
+    }
+
+	public static class To
+    {
+	<# for (var i=0;i<4;i++ ) {#>
+		<#var generics = i==0 ? "" : string.Join(",", Enumerable.Range(1,i).Select(n=>"T"+n)) + ",";#>
+		
+        public static Expression<Func<<#=generics#>TR>> Expression<<#=generics#>TR>(Expression<Func<<#=generics#>TR>> expression)
+        {
+            return expression;
+        }
+	<# } #>
+    }
+
+    public abstract class QueryBase<TDB>
+    {
+        private static Dictionary<string, object> _cachedQuery = new Dictionary<string, object>();
+        private static ReaderWriterLockSlim _locked = new ReaderWriterLockSlim();
+
+	<# for (var i=0;i<4;i++ ) {#>
+		<#var generics = i==0 ? "" : string.Join(",", Enumerable.Range(1,i).Select(n=>"T"+n).ToArray()) + ",";#>
+		
+        public abstract Func<TDB, <#=generics#>TR> Compiled<<#=generics#>TR>(Expression<Func<TDB, <#=generics#>TR>> query);
+	<# } #>
+
+		public static void Clear()
+		{
+			_cachedQuery.Clear();
+		}
+
+        private int GetOptionHash<T>(T option)
+        {
+            var values = option as IEnumerable;
+            if (values != null)
+            {
+                return string.Join("\r\n", values.OfType<object>().Select(v => v.ToString()).ToArray()).GetHashCode();
+            }
+            return option.GetHashCode();
+        }
+
+		private object GetCache(string key, Func<object> compiledQueryFunctor)
+		{
+            _locked.EnterUpgradeableReadLock();
+            try
+            {
+                object cachedQuery;
+                if (_cachedQuery.TryGetValue(key, out cachedQuery))
+                    return cachedQuery;
+
+                var compiedQuery = compiledQueryFunctor();
+                try
+                {
+                    _locked.EnterWriteLock();
+                    if (!_cachedQuery.ContainsKey(key))
+                    {
+                        _cachedQuery[key] = compiedQuery;
+                    }
+                }
+                finally
+                {
+                    _locked.ExitWriteLock();
+                }
+                return compiedQuery;
+            }
+            finally
+            {
+                _locked.ExitUpgradeableReadLock();
+            }
+        }
+
+	<# for (var i=0;i<4;i++ ) {#>
+		<#var generics = i==0 ? "" : string.Join(",", Enumerable.Range(1,i).Select(n=>"T"+n)) + ",";#>
+		<#var options = i==0 ? "" : "," + string.Join(",", Enumerable.Range(1,i).Select(n=>"option"+n));#>
+		<#var formats = i==0 ? "" : ":" + string.Join(":", Enumerable.Range(1,i).Select(n=>"{" + n + "}"));#>
+		<#var hashs = i==0 ? "" : "," + string.Join(",", Enumerable.Range(1,i).Select(n=>"GetOptionHash(option" + n + ")"));#>
+
+		public Func<TDB, <#=generics#>TR> Fast<<#=generics#>TR>(Expression<Func<TDB, <#=generics#>TR>> query) where TR : class
+        {
+            Func<TDB, <#=generics#>TR> wrapper = (context<#=options#>) =>
+            {
+			<# if (i==0) { #>
+
+				var key = string.Format("{0}", query.ToString().GetHashCode());
+			<# } else { #>
+				
+				var replaces = new Dictionary<string, Expression>{
+					<# for(var j=1; j<=i; j ++) {#>{query.Parameters[<#=j#>].Name, Expression.Constant(option<#=j#>)},
+					<# } #>
+				};
+			
+                query = new ParameterToConstantVisitor().Replace(query, replaces) as Expression<Func<TDB, <#=generics#>TR>>;
+				var key = string.Format("{0}<#=formats#>", query.ToString().GetHashCode()<#=hashs#>);
+			<# } #>
+
+				var compiledQuery = GetCache(key, ()=>Compiled(query));
+                return (compiledQuery as Func<TDB, <#=generics#>TR>)(context<#=options#>);
+            };
+
+            return wrapper;
+        }
+	<#}#>
+    }
+}

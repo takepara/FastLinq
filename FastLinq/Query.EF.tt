@@ -1,0 +1,31 @@
+﻿<#@ template debug="false" hostspecific="false" language="C#" #>
+<#@ output extension=".cs" #>
+<#@ Assembly Name="System.Core.dll" #>
+<#@ import namespace="System" #>
+<#@ import namespace="System.IO" #>
+<#@ import namespace="System.Text" #>
+<#@ import namespace="System.Diagnostics" #>
+<#@ import namespace="System.Linq" #>
+<#@ import namespace="System.Collections" #>
+<#@ import namespace="System.Collections.Generic" #> 
+using System;
+using System.Linq.Expressions;
+
+namespace FastLinq.LinqToEntity
+{
+
+
+    public class Query<TDB> : QueryBase<TDB>
+        where TDB : System.Data.Objects.ObjectContext
+    {
+	<# for (var i=0;i<4;i++ ) {#>
+		<#var generics = i==0 ? "" : string.Join(",", Enumerable.Range(1,i).Select(n=>"T"+n)) + ",";#>
+
+		public override Func<TDB, <#=generics#>TR> Compiled<<#=generics#>TR>(Expression<Func<TDB, <#=generics#>TR>> query)
+        {
+            return System.Data.Objects.CompiledQuery.Compile(query);
+        }
+	<#}#>
+	
+    }
+}
