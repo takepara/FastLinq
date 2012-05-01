@@ -460,14 +460,13 @@ namespace FastLinq
                     Console.WriteLine("-With data cache");
                     TestLinqToSql2(j);
                 }
-
-                if (Environment.Version.Major >= 4)
+                
+#if RUNNING_ON_4
+                Console.WriteLine("LINQ to Entity 4 {0} * {1}", MAX, j + 1);
                 {
-                    Console.WriteLine("LINQ to Entity 4 {0} * {1}", MAX, j + 1);
-                    {
-                        TestLinqToEntity(j);
-                    }
+                    TestLinqToEntity(j);
                 }
+#endif
             }
 
             Console.ReadLine();

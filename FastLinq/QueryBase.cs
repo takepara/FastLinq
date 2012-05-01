@@ -9,29 +9,6 @@ using System.Threading;
 
 namespace FastLinq
 {
-    public class ParameterToConstantVisitor : ExpressionVisitor
-    {
-        readonly HashSet<string> _replaced = new HashSet<string>();
-        Dictionary<string, Expression> _replaces;
-
-        public Expression Replace(Expression expression, Dictionary<string, Expression> replaces)
-        {
-            _replaces = replaces;
-
-            return base.Visit(expression);
-        }
-
-        protected override Expression VisitParameter(ParameterExpression node)
-        {
-            if (_replaces.ContainsKey(node.Name) && !_replaced.Contains(node.Name))
-            {
-                _replaced.Add(node.Name);
-                return _replaces[node.Name];
-            }
-            return base.VisitParameter(node);
-        }
-    }
-
 	public static class To
     {
 					

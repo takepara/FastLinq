@@ -5,6 +5,7 @@ using System.Linq.Expressions;
 
 namespace FastLinq
 {
+#if NOT_RUNNING_ON_4
     /// <summary>
     /// http://msdn.microsoft.com/en-us/library/bb882521(v=vs.90).aspx
     /// </summary>
@@ -366,4 +367,5 @@ namespace FastLinq
             return iv;
         }
     }
+#endif
 }
